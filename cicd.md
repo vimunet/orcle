@@ -1,4 +1,4 @@
-Sure, here is a comprehensive guide on setting up a complete CI/CD pipeline using GitLab to build a Java Maven Spring Boot application, containerize it with Docker, and deploy it to a Nexus repository. This guide includes all necessary steps from setting up the Nexus repository to configuring the GitLab pipeline.
+Here is a complete guide on how to set up a CI/CD pipeline using GitLab to build a Java Maven Spring Boot application, containerize it with Docker, and deploy it to a Nexus repository. This guide includes steps for using a custom `settings.xml` file located in your repository for configuring Maven settings.
 
 ### Prerequisites
 
@@ -8,10 +8,11 @@ Sure, here is a comprehensive guide on setting up a complete CI/CD pipeline usin
 
 ### Steps
 
-1. **Set Up Nexus Repository Manager**
-2. **Create a Spring Boot Application**
-3. **Dockerize the Spring Boot Application**
-4. **Configure GitLab CI/CD Pipeline**
+1. Set Up Nexus Repository Manager
+2. Create a Spring Boot Application
+3. Dockerize the Spring Boot Application
+4. Add Custom `settings.xml` to Your Repository
+5. Configure GitLab CI/CD Pipeline
 
 ### 1. Set Up Nexus Repository Manager
 
@@ -37,6 +38,8 @@ Download and install Nexus Repository Manager from the official [Sonatype websit
 ### 2. Create a Spring Boot Application
 
 Create a new Spring Boot application or use an existing one. Ensure your `pom.xml` is correctly configured.
+
+#### Example `pom.xml`
 
 ```xml
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -79,6 +82,8 @@ Create a new Spring Boot application or use an existing one. Ensure your `pom.xm
 
 Create a `Dockerfile` in the root directory of your project:
 
+#### Example `Dockerfile`
+
 ```Dockerfile
 # Use an official Maven image to build the app
 FROM maven:3.8.1-jdk-11 AS build
@@ -96,9 +101,74 @@ COPY --from=build /home/app/target/demo-0.0.1-SNAPSHOT.jar /app/demo.jar
 ENTRYPOINT ["java","-jar","/app/demo.jar"]
 ```
 
-### 4. Configure GitLab CI/CD Pipeline
+### 4. Add Custom `settings.xml` to Your Repository
+
+Place your custom `settings.xml` file in a directory within your repository. For example, you can place it in a directory called `.maven`:
+
+#### Example Repository Structure
+
+```
+/your-project-root
+  |-- .maven/
+       |-- settings.xml
+  |-- src/
+  |-- pom.xml
+  |-- Dockerfile
+  |-- .gitlab-ci.yml
+```
+
+#### Example `settings.xml`
+
+```xml
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <servers>
+    <server>
+      <id>nexus</id>
+      <username>${env.NEXUS_USERNAME}</username>
+      <password>${env.NEXUS_PASSWORD}</password>
+    </server>
+  </servers>
+  <mirrors>
+    <mirror>
+      <id>nexus</id>
+      <mirrorOf>*</mirrorOf>
+      <url>http://nexus.example.com:8081/repository/maven-public/</url>
+    </mirror>
+  </mirrors>
+  <profiles>
+    <profile>
+      <id>nexus</id>
+      <repositories>
+        <repository>
+          <id>central</id>
+          <url>http://nexus.example.com:8081/repository/maven-central/</url>
+        </repository>
+        <repository>
+          <id>snapshots</id>
+          <url>http://nexus.example.com:8081/repository/maven-snapshots/</url>
+          <releases>
+            <enabled>false</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>nexus</activeProfile>
+  </activeProfiles>
+</settings>
+```
+
+### 5. Configure GitLab CI/CD Pipeline
 
 Create a `.gitlab-ci.yml` file in the root directory of your project:
+
+#### Example `.gitlab-ci.yml`
 
 ```yaml
 image: docker:latest
@@ -122,7 +192,10 @@ build:
   stage: build
   image: maven:3.8.1-jdk-11
   script:
-    - mvn clean package
+    # Copy the custom settings.xml file
+    - mkdir -p /root/.m2
+    - cp .maven/settings.xml /root/.m2/settings.xml
+    - mvn -s /root/.m2/settings.xml clean package
   artifacts:
     paths:
       - target/*.jar
@@ -145,20 +218,11 @@ deploy:
 
 ### Explanation
 
-1. **Define the Image and Services**:
-   - Use Docker as the base image and Docker-in-Docker service.
-2. **Define Variables**:
-   - `DOCKER_HOST` and `DOCKER_DRIVER` are set up for Docker-in-Docker.
-3. **Stages**:
-   - Define the stages: `build`, `dockerize`, and `deploy`.
-4. **before_script**:
-   - Log in to the Nexus Docker repository using environment variables `NEXUS_USERNAME` and `NEXUS_PASSWORD`.
-5. **Build Stage**:
-   - Use Maven to build the application and save the jar file as an artifact.
-6. **Dockerize Stage**:
-   - Build the Docker image and push it to the Nexus repository.
-7. **Deploy Stage**:
-   - Placeholder stage for additional deployment steps.
+1. **Copy the custom `settings.xml` file**:
+   - The `script` section in the `build` stage includes commands to create the Maven configuration directory (`/root/.m2`) and copy the custom `settings.xml` file from your repository to this directory.
+   
+2. **Use the custom `settings.xml` file**:
+   - The `mvn` command uses the `-s` option to specify the custom `settings.xml` file.
 
 ### Set Environment Variables in GitLab
 
@@ -175,4 +239,4 @@ docker login nexus.example.com:8082
 docker pull nexus.example.com:8082/docker-repo/demo:latest
 ```
 
-By following these steps, you can set up a complete CI/CD pipeline using GitLab to build, containerize, and deploy a Java Maven Spring Boot application to a Nexus repository.
+By following these steps, you can set up a complete CI/CD pipeline using GitLab to build, containerize, and deploy a Java Maven Spring Boot application to a Nexus repository, using a custom `settings.xml` file for Maven configurations.
