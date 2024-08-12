@@ -1,0 +1,51 @@
+pipeline:
+  variables:
+    - name: env
+      type: String
+      value: ""
+    - name: image
+      type: String
+      value: ""
+
+  stages:
+    - stage:
+        name: Set Variables Stage
+        type: CI
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Set Variables
+                  identifier: set_variables
+                  type: Script
+                  spec:
+                    shell: Bash
+                    command: |
+                      #!/bin/bash
+                      env_value="production"
+                      image_value="my-docker-image:latest"
+
+                      echo "env=${env_value}" >> $HARNESS_ENV_FILE_PATH
+                      echo "image=${image_value}" >> $HARNESS_ENV_FILE_PATH
+
+    - stage:
+        name: Deploy Stage
+        type: CI
+        spec:
+          execution:
+            steps:
+              - step:
+                  name: Deploy Application
+                  identifier: deploy_app
+                  type: Script
+                  spec:
+                    shell: Bash
+                    command: |
+                      #!/bin/bash
+                      
+                      # Accessing the variables using 'pipeline.variables'
+                      echo "Deploying to environment: ${pipeline.variables.env}"
+                      echo "Using Docker image: ${pipeline.variables.image}"
+
+                      # Example usage in a command
+                      kubectl set image deployment/my-app my-app-container=${pipeline.variables.image} --namespace=${pipeline.variables.env}
