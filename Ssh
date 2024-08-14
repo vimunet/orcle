@@ -1,1 +1,2 @@
 curl -u your-username:your-password --upload-file path/to/your-file.jar "http://your-nexus-repo-url/repository/your-snapshot-repo/$(echo com.yourcompany | tr '.' '/')/your-artifact-id/1.0-SNAPSHOT/your-artifact-id-1.0-SNAPSHOT.jar"
+curl -u your-username:your-password --upload-file path/to/your-file.jar "http://your-nexus-repo-url/repository/your-snapshot-repo/$(echo com.yourcompany | sed 's/\./\//g')/your-artifact-id/1.0-SNAPSHOT/your-artifact-id-1.0-SNAPSHOT.jar"
