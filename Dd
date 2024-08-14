@@ -1,0 +1,62 @@
+openssl s_client -showcerts -connect secretsmanager.us-east-1.amazonaws.com:443 < /dev/null 2>/dev/null | openssl x509 -outform PEM > aws-cert.pem
+To obtain the SSL certificate for an AWS service used by the AWS Java SDK, you'll need to determine the specific endpoint URL that your application connects to. The AWS Java SDK typically uses service-specific endpoints based on the region you're operating in.
+
+### Steps to Identify the Endpoint URL and Obtain the Certificate:
+
+#### 1. **Identify the AWS Service and Region:**
+
+Determine the specific AWS service and the region you're connecting to. For example:
+- **Service:** AWS Secrets Manager
+- **Region:** `us-east-1`
+
+#### 2. **Determine the Endpoint URL:**
+
+The endpoint URL is usually in the following format:
+
+```plaintext
+https://service-name.region.amazonaws.com
+```
+
+For example:
+- **Secrets Manager in `us-east-1`:** `https://secretsmanager.us-east-1.amazonaws.com`
+- **S3 in `us-west-2`:** `https://s3.us-west-2.amazonaws.com`
+
+You can find the full list of AWS service endpoints in the [AWS documentation](https://docs.aws.amazon.com/general/latest/gr/rande.html).
+
+#### 3. **Use OpenSSL to Retrieve the Certificate:**
+
+Once you have the endpoint URL, you can use the `openssl` command to fetch the SSL certificate from the server.
+
+```bash
+openssl s_client -showcerts -connect secretsmanager.us-east-1.amazonaws.com:443
+```
+
+This command connects to the specified AWS service endpoint and retrieves the SSL certificate chain. The output will display the certificate(s) in PEM format.
+
+#### 4. **Save the Certificate:**
+
+If you need to save the certificate to a file, you can redirect the output:
+
+```bash
+openssl s_client -showcerts -connect secretsmanager.us-east-1.amazonaws.com:443 < /dev/null 2>/dev/null | openssl x509 -outform PEM > aws-cert.pem
+```
+
+#### 5. **Use the Certificate:**
+
+- You can now add this certificate to your Java trust store or a custom trust store as described in previous instructions.
+- Ensure your Java application trusts this certificate to avoid `PKIX path building failed` errors.
+
+### Example for AWS Secrets Manager in `us-east-1`:
+
+```bash
+openssl s_client -showcerts -connect secretsmanager.us-east-1.amazonaws.com:443 < /dev/null 2>/dev/null | openssl x509 -outform PEM > secretsmanager-us-east-1.pem
+```
+
+### Summary:
+
+1. Identify the service and region.
+2. Construct the endpoint URL.
+3. Use `openssl` to retrieve the certificate.
+4. Save and trust the certificate as needed.
+
+This approach ensures that you have the correct SSL certificate for the specific AWS service endpoint your Java application is using.
