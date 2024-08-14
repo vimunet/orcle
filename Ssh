@@ -1,2 +1,56 @@
 curl -u your-username:your-password --upload-file path/to/your-file.jar "http://your-nexus-repo-url/repository/your-snapshot-repo/$(echo com.yourcompany | tr '.' '/')/your-artifact-id/1.0-SNAPSHOT/your-artifact-id-1.0-SNAPSHOT.jar"
 curl -u your-username:your-password --upload-file path/to/your-file.jar "http://your-nexus-repo-url/repository/your-snapshot-repo/$(echo com.yourcompany | sed 's/\./\//g')/your-artifact-id/1.0-SNAPSHOT/your-artifact-id-1.0-SNAPSHOT.jar"
+If `curl` itself is not working for pushing the JAR file to Nexus, it could be due to a number of issues. Let's troubleshoot and suggest a different approach.
+
+### 1. **Check `curl` Installation:**
+Ensure `curl` is installed on your system:
+
+```bash
+curl --version
+```
+
+If not installed, you can install it with:
+
+- **Debian/Ubuntu:** `sudo apt-get install curl`
+- **Red Hat/CentOS:** `sudo yum install curl`
+
+### 2. **Alternative Approach: Using Maven to Deploy to Nexus**
+If `curl` isn't working, you can use Maven to deploy the JAR to the Nexus repository. Maven is a common tool for this purpose, and it integrates well with Nexus.
+
+Here’s a single-line Maven command that can deploy a JAR file to a Nexus snapshot repository:
+
+```bash
+mvn deploy:deploy-file -DgroupId=com.yourcompany -DartifactId=your-artifact-id -Dversion=1.0-SNAPSHOT -Dpackaging=jar -Dfile=path/to/your-file.jar -DrepositoryId=nexus-snapshots -Durl=http://your-nexus-repo-url/repository/your-snapshot-repo/
+```
+
+### Replace the following placeholders:
+- `com.yourcompany`: Your group ID.
+- `your-artifact-id`: Your artifact ID.
+- `1.0-SNAPSHOT`: Your version.
+- `path/to/your-file.jar`: Path to your JAR file.
+- `http://your-nexus-repo-url/repository/your-snapshot-repo/`: Nexus snapshot repository URL.
+- `nexus-snapshots`: ID of the repository, which should be configured in your Maven `settings.xml`.
+
+### Configuring Maven:
+Ensure you have a valid `~/.m2/settings.xml` with your Nexus credentials:
+
+```xml
+<servers>
+  <server>
+    <id>nexus-snapshots</id>
+    <username>your-username</username>
+    <password>your-password</password>
+  </server>
+</servers>
+```
+
+### 3. **Using `curl` with POST instead of PUT:**
+If there's an issue with the `PUT` method in `curl`, you can try using the `POST` method:
+
+```bash
+curl -v -u your-username:your-password -X POST --upload-file path/to/your-file.jar "http://your-nexus-repo-url/service/rest/v1/components?repository=your-snapshot-repo"
+```
+
+This uses the Nexus REST API to upload the component. However, this requires additional configuration and may need to follow Nexus's specific REST API requirements.
+
+Let me know if any of these solutions work or if you need further assistance!
