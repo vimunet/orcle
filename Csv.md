@@ -1,6 +1,28 @@
-To ensure that integers are properly represented as numbers and not as strings in the JSON output, you need to detect numeric fields and convert them to the appropriate type before writing them to JSON. Here's an updated version of the program that handles this:
+Here is the complete solution, including the full program, explanation, and examples.
 
-### Updated Java Program:
+### 1. Add the necessary dependencies:
+
+If you're using Maven, add these dependencies to your `pom.xml`:
+
+```xml
+<dependencies>
+    <!-- OpenCSV for CSV reading -->
+    <dependency>
+        <groupId>com.opencsv</groupId>
+        <artifactId>opencsv</artifactId>
+        <version>5.5.2</version>
+    </dependency>
+
+    <!-- Gson for JSON conversion -->
+    <dependency>
+        <groupId>com.google.code.gson</groupId>
+        <artifactId>gson</artifactId>
+        <version>2.8.8</version>
+    </dependency>
+</dependencies>
+```
+
+### 2. Java Program to Convert CSV to JSON:
 
 ```java
 import com.google.gson.Gson;
@@ -16,18 +38,23 @@ import java.util.*;
 public class CsvToJsonConverter {
 
     public static void main(String[] args) {
-        String csvFile = "data.csv";
-        String jsonFile = "data.json";
+        String csvFile = "data.csv"; // Path to the CSV file
+        String jsonFile = "data.json"; // Path to the output JSON file
 
         try {
+            // Read CSV and store it as a list of maps
             List<Map<String, Object>> data = readCsv(csvFile);
+
+            // Write the JSON output to the file
             writeJson(data, jsonFile);
+
             System.out.println("JSON file created successfully.");
         } catch (IOException | CsvException e) {
             e.printStackTrace();
         }
     }
 
+    // Method to read CSV and convert rows to a list of maps
     private static List<Map<String, Object>> readCsv(String csvFile) throws IOException, CsvException {
         List<Map<String, Object>> csvData = new ArrayList<>();
         try (CSVReader reader = new CSVReader(new FileReader(csvFile))) {
@@ -39,7 +66,7 @@ public class CsvToJsonConverter {
                 for (int j = 0; j < headers.length; j++) {
                     String value = rows.get(i)[j];
 
-                    // Try to parse the value as an integer, otherwise keep it as a string
+                    // Check if value is numeric and convert to Integer if applicable
                     if (isNumeric(value)) {
                         rowData.put(headers[j], Integer.parseInt(value));
                     } else {
@@ -52,6 +79,7 @@ public class CsvToJsonConverter {
         return csvData;
     }
 
+    // Method to write the data to JSON format
     private static void writeJson(List<Map<String, Object>> data, String jsonFile) throws IOException {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try (FileWriter writer = new FileWriter(jsonFile)) {
@@ -59,6 +87,7 @@ public class CsvToJsonConverter {
         }
     }
 
+    // Helper method to check if a value is numeric (integer)
     private static boolean isNumeric(String value) {
         try {
             Integer.parseInt(value);
@@ -70,15 +99,23 @@ public class CsvToJsonConverter {
 }
 ```
 
-### Changes:
+### 3. Explanation:
 
-1. **Map<String, Object>**: The program now uses `Map<String, Object>` instead of `Map<String, String>`. This allows us to store both strings and integers.
+- **Dependencies**:
+   - `OpenCSV` (`com.opencsv`) is used to read the CSV file.
+   - `Gson` (`com.google.code.gson`) is used to convert the data into JSON and write it to a file.
 
-2. **isNumeric Method**: A helper method checks whether a string can be parsed into an integer. If it can, the value is stored as an `Integer`, otherwise it's kept as a `String`.
+- **`readCsv` Method**:
+   - This method reads the CSV file into a list of maps where each map represents a row. The key for each entry in the map is the header, and the value is the corresponding cell value from that row.
+   - The method checks if a value can be parsed as an integer and, if so, converts it into an `Integer` object. Otherwise, the value is stored as a string.
 
-3. **Integer Parsing**: During CSV reading, the code checks if the value is numeric and converts it to an `Integer` if so. Otherwise, it leaves it as a string.
+- **`writeJson` Method**:
+   - Converts the list of maps into JSON format and writes it to a specified output file using `Gson`.
 
-### CSV Example (`data.csv`):
+- **`isNumeric` Method**:
+   - This method checks whether a string can be parsed as an integer. If it can, the string will be converted into an integer in the final JSON file.
+
+### 4. CSV Example (`data.csv`):
 
 ```csv
 id,name,age
@@ -87,7 +124,7 @@ id,name,age
 3,Jim Brown,40
 ```
 
-### JSON Output (`data.json`):
+### 5. JSON Output (`data.json`):
 
 ```json
 [
@@ -109,4 +146,10 @@ id,name,age
 ]
 ```
 
-Now, integers will be written to the JSON output as numbers instead of being quoted strings.
+### Key Points:
+
+- **Numbers in JSON**: In this example, integers such as `id` and `age` are represented as numbers in the JSON file, not as strings.
+- **Non-numeric Data**: Names and any other non-numeric data will remain as strings in the JSON output.
+- **Scalability**: This solution can handle different types of CSV files and can be easily expanded for more complex data structures.
+
+This program reads a CSV file, processes the rows and columns, and outputs a properly structured JSON file with numbers and strings correctly represented.
