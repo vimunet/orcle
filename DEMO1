@@ -1,0 +1,63 @@
+import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import javax.swing.*;
+
+public class MouseMoverWithKeyListener extends JFrame implements KeyListener {
+    private volatile boolean running = true;
+
+    public MouseMoverWithKeyListener() {
+        setTitle("Mouse Mover with Key Listener");
+        setSize(300, 100);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new FlowLayout());
+        JLabel label = new JLabel("Press Ctrl+D to stop mouse movement.");
+        add(label);
+        addKeyListener(this);
+        setVisible(true);
+
+        // Start the mouse mover in a separate thread
+        Thread mouseMoverThread = new Thread(this::moveMousePeriodically);
+        mouseMoverThread.setDaemon(true); // Allow JVM to exit if the main frame is closed
+        mouseMoverThread.start();
+    }
+
+    private void moveMousePeriodically() {
+        try {
+            Robot robot = new Robot();
+            while (running) {
+                Point mousePosition = MouseInfo.getPointerInfo().getLocation();
+                int x = (int) mousePosition.getX();
+                int y = (int) mousePosition.getY();
+                
+                // Move the mouse by 1 pixel and back
+                robot.mouseMove(x + 1, y);
+                robot.mouseMove(x, y);
+                
+                Thread.sleep(15000); // Wait for 15 seconds
+            }
+        } catch (AWTException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void keyTyped(KeyEvent e) {}
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+        if (e.isControlDown() && e.getKeyCode() == KeyEvent.VK_D) {
+            running = false; // Stop the mouse movement
+            System.out.println("Mouse movement stopped.");
+            dispose(); // Close the application window
+        }
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {}
+
+    public static void main(String[] args) {
+        // Run the application in the Event Dispatch Thread (EDT)
+        SwingUtilities.invokeLater(MouseMoverWithKeyListener::new);
+    }
+}
