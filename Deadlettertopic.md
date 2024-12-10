@@ -1,39 +1,54 @@
-To achieve the goal of consuming all records from dead letter topics, republishing them to their respective source topics, and shutting down the application when processing is complete, you can use **Spring Boot with Kafka**. Here's a step-by-step guide:
+Yes, it is a good practice to move the Kafka consumer properties to a factory to make the code cleaner and reusable. Below is the updated implementation with a `ConsumerFactory` for Kafka consumers.
 
 ---
 
-### **1. Create a Kafka Listener for Dead Letter Topics**
-Configure a Kafka consumer that listens to a list of dead letter topics. Use `@KafkaListener` or `KafkaConsumer`.
+### **1. Kafka Consumer Factory**
+
+This factory centralizes the creation of Kafka consumers with the required properties.
+
+```java
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.util.Properties;
+
+@Configuration
+public class KafkaConsumerFactory {
+
+    @Bean
+    public Properties kafkaConsumerProperties() {
+        Properties props = new Properties();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "dead-letter-processor");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"); // Start at the earliest offset
+        return props;
+    }
+}
+```
 
 ---
 
-### **2. Process Messages and Republish to Source Topics**
-Create a method to process each message and republish it to the appropriate source topic using a `KafkaTemplate`.
+### **2. Updated Dead Letter Processor**
 
----
-
-### **3. Detect When All Messages Are Consumed**
-Use the Kafka `ConsumerRecords` poll method to check when there are no more records in the dead letter topics.
-
----
-
-### **4. Shut Down the Application**
-Once all records are processed and topics are empty, trigger an orderly shutdown using `SpringApplication.exit`.
-
----
-
-### Implementation Example
+The `DeadLetterProcessor` now uses the consumer properties from the factory.
 
 ```java
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -43,63 +58,70 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-@SpringBootApplication
-public class DeadLetterProcessorApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(DeadLetterProcessorApplication.class, args);
-    }
-}
-
 @Component
-class DeadLetterProcessor {
+public class DeadLetterProcessor {
 
-    @Value("${kafka.bootstrap-servers}")
-    private String bootstrapServers;
+    private static final Logger logger = LoggerFactory.getLogger(DeadLetterProcessor.class);
 
-    @Value("#{'${dead.letter.topics}'.split(',')}")
+    @Value("${dead.letter.topics}")
     private List<String> deadLetterTopics;
 
     @Value("#{${topic.mapping}}") // Map of dead letter topic -> source topic
     private Map<String, String> topicMapping;
 
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final Properties consumerProperties;
 
-    public DeadLetterProcessor(KafkaTemplate<String, String> kafkaTemplate) {
+    public DeadLetterProcessor(KafkaTemplate<String, String> kafkaTemplate, Properties consumerProperties) {
         this.kafkaTemplate = kafkaTemplate;
+        this.consumerProperties = consumerProperties;
     }
 
     @PostConstruct
     public void processDeadLetterTopics() {
-        Properties props = new Properties();
-        props.put("bootstrap.servers", bootstrapServers);
-        props.put("group.id", "dead-letter-processor");
-        props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-        props.put("enable.auto.commit", "false");
-
-        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
+        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProperties)) {
             deadLetterTopics.forEach(topic -> consumer.assign(Collections.singletonList(new TopicPartition(topic, 0))));
 
             while (true) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(5));
-                if (records.isEmpty()) {
-                    // If all topics are empty, shut down the application
-                    System.out.println("All dead letter topics are empty. Shutting down.");
-                    SpringApplication.exit(SpringApplication.run(DeadLetterProcessorApplication.class), () -> 0);
-                    break;
-                }
-
-                for (ConsumerRecord<String, String> record : records) {
-                    String sourceTopic = topicMapping.get(record.topic());
-                    if (sourceTopic != null) {
-                        kafkaTemplate.send(new ProducerRecord<>(sourceTopic, record.key(), record.value()));
-                        System.out.printf("Republished record from %s to %s%n", record.topic(), sourceTopic);
-                    } else {
-                        System.err.printf("No mapping found for topic: %s%n", record.topic());
+                try {
+                    ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(5));
+                    if (records.isEmpty()) {
+                        logger.info("All dead letter topics are empty. Shutting down.");
+                        SpringApplication.exit(SpringApplication.run(DeadLetterProcessorApplication.class), () -> 0);
+                        break;
                     }
+
+                    for (ConsumerRecord<String, String> record : records) {
+                        processRecord(record);
+                    }
+
+                    consumer.commitSync(); // Commit offsets after processing
+                } catch (Exception e) {
+                    logger.error("Error during processing or committing offsets", e);
                 }
-                consumer.commitSync(); // Commit offsets after processing
             }
+        } catch (Exception e) {
+            logger.error("Error initializing Kafka consumer", e);
+        }
+    }
+
+    @Retryable(
+            value = {Exception.class},
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 2000, multiplier = 2)
+    )
+    private void processRecord(ConsumerRecord<String, String> record) {
+        try {
+            String sourceTopic = topicMapping.get(record.topic());
+            if (sourceTopic != null) {
+                kafkaTemplate.send(sourceTopic, record.key(), record.value()).get();
+                logger.info("Republished record from {} to {}", record.topic(), sourceTopic);
+            } else {
+                logger.warn("No mapping found for topic: {}", record.topic());
+            }
+        } catch (Exception e) {
+            logger.error("Failed to process record from topic: {} with key: {}", record.topic(), record.key(), e);
+            throw e; // Trigger retry if enabled
         }
     }
 }
@@ -107,24 +129,22 @@ class DeadLetterProcessor {
 
 ---
 
-### **Explanation of Key Components**
-1. **Kafka Consumer**:
-   - Reads messages from dead letter topics.
-   - Manages offset commits manually to ensure reliability.
+### **3. Benefits of Moving to a Consumer Factory**
 
-2. **KafkaTemplate**:
-   - Publishes messages to their respective source topics.
+1. **Reusability**: 
+   - The `kafkaConsumerProperties` bean can be reused for other consumers in the application.
 
-3. **Dynamic Topic Mapping**:
-   - Uses a configuration map to determine the source topic for each dead letter topic.
+2. **Centralized Configuration**:
+   - All Kafka consumer-related properties are in a single location, making maintenance easier.
 
-4. **Orderly Shutdown**:
-   - When all records are consumed, the application shuts down using `SpringApplication.exit`.
+3. **Clean Code**:
+   - The `DeadLetterProcessor` class is now focused only on the business logic, with no clutter from consumer configuration details.
 
 ---
 
-### **Configuration**
-Add the following properties to `application.properties` or `application.yml`:
+### **4. Application Properties**
+
+The application properties remain unchanged:
 
 ```properties
 kafka.bootstrap-servers=localhost:9092
@@ -135,9 +155,4 @@ topic.mapping.dead-letter-topic2=source-topic2
 
 ---
 
-### **Run the Application**
-1. Start the Kafka cluster.
-2. Deploy this Spring Boot application.
-3. The application will consume, republish, and shut down once all records are processed.
-
-This approach ensures the process is efficient, scalable, and handles shutdown gracefully.
+This implementation achieves a cleaner design while adhering to good software engineering principles.
