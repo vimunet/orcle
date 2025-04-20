@@ -1,0 +1,179 @@
+import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.util.Random;
+
+public class IntelliJUserSimulator {
+
+    private static final String[] FILE_NAMES = {
+            "Main.java", "UserService.java", "AppConfig.java", "DatabaseConnector.java"
+    };
+
+    private static final String[] DUMMY_LINES = {
+            "public static void main(String[] args) {",
+            "    System.out.println(\"Hello, developer! This is IntelliJ simulation.\");",
+            "    List<String> items = Arrays.asList(\"One\", \"Two\", \"Three\");",
+            "    for (String item : items) {",
+            "        System.out.println(\"Item: \" + item);",
+            "    }",
+            "    int result = calculateSum(5, 10, 15);",
+            "    if (result > 20) {",
+            "        System.out.println(\"High score!\");",
+            "    } else {",
+            "        System.out.println(\"Try again.\");",
+            "    }",
+            "}",
+            "private int calculateSum(int... values) {",
+            "    return Arrays.stream(values).sum();",
+            "}"
+    };
+
+    private static final Random random = new Random();
+
+    public static void main(String[] args) throws Exception {
+        Robot robot = new Robot();
+        System.out.println("Simulation starting in 5 seconds... Focus IntelliJ editor.");
+        Thread.sleep(5000); // Time to focus the editor
+
+        while (true) {
+            int action = random.nextInt(6);
+            switch (action) {
+                case 0 -> openRandomFile(robot);
+                case 1 -> typeJavaCode(robot);
+                case 2 -> simulateDeleteAndEdit(robot);
+                case 3 -> simulateCopyPaste(robot);
+                case 4 -> moveMouseRandomly(robot);
+                case 5 -> pressEscape(robot);
+            }
+            Thread.sleep(randomDelay());
+        }
+    }
+
+    private static void openRandomFile(Robot robot) throws InterruptedException {
+        String fileName = FILE_NAMES[random.nextInt(FILE_NAMES.length)];
+
+        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_SHIFT, KeyEvent.VK_N);
+        Thread.sleep(randomShortDelay());
+
+        typeLine(robot, fileName);
+        Thread.sleep(randomShortDelay());
+
+        pressEscape(robot);
+        Thread.sleep(randomShortDelay());
+
+        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_SHIFT, KeyEvent.VK_N);
+        Thread.sleep(randomShortDelay());
+
+        typeLine(robot, fileName);
+        Thread.sleep(randomShortDelay());
+
+        pressEnter(robot);
+        Thread.sleep(randomDelay());
+    }
+
+    private static void typeJavaCode(Robot robot) throws InterruptedException {
+        for (String line : DUMMY_LINES) {
+            typeLine(robot, line);
+            pressEnter(robot);
+            Thread.sleep(randomShortDelay());
+        }
+    }
+
+    private static void simulateDeleteAndEdit(Robot robot) throws InterruptedException {
+        for (int i = 0; i < 10; i++) {
+            pressKey(robot, KeyEvent.VK_LEFT);
+            Thread.sleep(randomShortDelay());
+        }
+
+        for (int i = 0; i < 5; i++) {
+            pressKey(robot, KeyEvent.VK_BACK_SPACE);
+            Thread.sleep(randomShortDelay());
+        }
+
+        typeLine(robot, "String name = \"Updated User\";");
+        pressEnter(robot);
+        Thread.sleep(randomDelay());
+    }
+
+    private static void simulateCopyPaste(Robot robot) throws InterruptedException {
+        pressKey(robot, KeyEvent.VK_HOME);
+        robot.keyPress(KeyEvent.VK_SHIFT);
+        pressKey(robot, KeyEvent.VK_END);
+        robot.keyRelease(KeyEvent.VK_SHIFT);
+        Thread.sleep(randomShortDelay());
+
+        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_C);
+        Thread.sleep(randomShortDelay());
+
+        pressKey(robot, KeyEvent.VK_DOWN);
+        Thread.sleep(randomShortDelay());
+
+        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_V);
+        Thread.sleep(randomDelay());
+    }
+
+    private static void moveMouseRandomly(Robot robot) throws InterruptedException {
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        int x = random.nextInt(screenSize.width);
+        int y = random.nextInt(screenSize.height);
+        robot.mouseMove(x, y);
+        Thread.sleep(randomDelay());
+    }
+
+    private static void pressEscape(Robot robot) throws InterruptedException {
+        pressKey(robot, KeyEvent.VK_ESCAPE);
+        Thread.sleep(randomShortDelay());
+    }
+
+    private static void typeLine(Robot robot, String line) throws InterruptedException {
+        for (char c : line.toCharArray()) {
+            typeChar(robot, c);
+            Thread.sleep(30 + random.nextInt(150)); // simulate natural typing pace
+        }
+    }
+
+    private static void typeChar(Robot robot, char c) {
+        try {
+            boolean upperCase = Character.isUpperCase(c);
+            int keyCode = KeyEvent.getExtendedKeyCodeForChar(c);
+
+            if (KeyEvent.CHAR_UNDEFINED == keyCode) return;
+
+            if (upperCase || isShiftChar(c)) robot.keyPress(KeyEvent.VK_SHIFT);
+
+            robot.keyPress(keyCode);
+            robot.keyRelease(keyCode);
+
+            if (upperCase || isShiftChar(c)) robot.keyRelease(KeyEvent.VK_SHIFT);
+
+        } catch (IllegalArgumentException ignored) {}
+    }
+
+    private static boolean isShiftChar(char c) {
+        return "~!@#$%^&*()_+{}|:\"<>?".indexOf(c) >= 0;
+    }
+
+    private static void pressKey(Robot robot, int key) {
+        robot.keyPress(key);
+        robot.keyRelease(key);
+    }
+
+    private static void pressKeyCombo(Robot robot, int mod1, int mod2, int key) {
+        robot.keyPress(mod1);
+        robot.keyPress(mod2);
+        pressKey(robot, key);
+        robot.keyRelease(mod2);
+        robot.keyRelease(mod1);
+    }
+
+    private static void pressEnter(Robot robot) {
+        pressKey(robot, KeyEvent.VK_ENTER);
+    }
+
+    private static long randomDelay() {
+        return 1000 + random.nextInt(9000); // 1 to 10 seconds
+    }
+
+    private static long randomShortDelay() {
+        return 200 + random.nextInt(800); // 200ms to 1000ms
+    }
+}
