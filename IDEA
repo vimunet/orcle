@@ -101,13 +101,13 @@ public class IntelliJUserSimulator {
         robot.keyRelease(KeyEvent.VK_SHIFT);
         Thread.sleep(randomShortDelay());
 
-        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_C);
+        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_C); // ✅ now valid
         Thread.sleep(randomShortDelay());
 
         pressKey(robot, KeyEvent.VK_DOWN);
         Thread.sleep(randomShortDelay());
 
-        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_V);
+        pressKeyCombo(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_V); // ✅ now valid
         Thread.sleep(randomDelay());
     }
 
@@ -155,6 +155,13 @@ public class IntelliJUserSimulator {
     private static void pressKey(Robot robot, int key) {
         robot.keyPress(key);
         robot.keyRelease(key);
+    }
+
+    // 🔁 Overloaded methods
+    private static void pressKeyCombo(Robot robot, int mod1, int key) {
+        robot.keyPress(mod1);
+        pressKey(robot, key);
+        robot.keyRelease(mod1);
     }
 
     private static void pressKeyCombo(Robot robot, int mod1, int mod2, int key) {
